@@ -11,6 +11,8 @@ import pandas_datareader
 from collections import Counter
 from sklearn import svm, cross_validation, neighbors
 from sklearn.ensemble import VotingClassifier, RandomForestClassifier
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
@@ -126,6 +128,12 @@ def do_ml(ticker):
     predictions = clf.predict(X_test)
     print('Predicted spread:', Counter(predictions))
 
+    # mat = confusion_matrix(y_test, predictions)
+    # sns.heatmap(mat, square=True, annot=True, cbar=False)
+    # plt.xlabel('predicted value')
+    # plt.ylabel('true value');
+
+    # plt.show()
     return confidence
 
 do_ml('BAC')
