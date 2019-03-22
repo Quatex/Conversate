@@ -7,9 +7,9 @@ import matplotlib.dates as mdates
 import os
 from matplotlib import style
 import pickle
-import pandas_datareader
+# import pandas_datareader
 from collections import Counter
-from sklearn import svm, cross_validation, neighbors
+from sklearn import svm, neighbors
 from sklearn.ensemble import VotingClassifier, RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
