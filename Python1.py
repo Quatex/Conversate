@@ -203,30 +203,12 @@ print(X_train.shape)
 print(y_train.shape)
 print(x_test.shape)
 
-regressor = Sequential()
-
-regressor.add(LSTM(units = 150, return_sequences = True, input_shape = (X_train.shape[1],X_train.shape[2])))
-regressor.add(Dropout(0.2))
-
-regressor.add(LSTM(units = 150, return_sequences = True))
-regressor.add(Dropout(0.2))
-
-regressor.add(LSTM(units = 150, return_sequences = True))
-regressor.add(Dropout(0.2))
-
-regressor.add(LSTM(units = 150))
-regressor.add(Dropout(0.2))
-
-regressor.add(Dense(units = y_train.shape[1]))
-
-regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
-
 
 
 X_train.shape
 y_train.shape
 
-regressor.fit(X_train, y_train, epochs= 100, batch_size = 100)
+regressor.fit(X_train, y_train, epochs= 100, batch_size = 32)
 
 regressor.save('my_model.h5')
 regressor.save_weights('my_model_weights.h5')
@@ -303,7 +285,7 @@ real_stock_price = sc.transform(real_stock_price_unscaled)
 
 print(real_stock_price[real_stock_price.shape[0] - 49:, 49])
 
-train_test_split_amount = 0.99
+train_test_split_amount = 0.95
 train_size = int(len(real_stock_price) * train_test_split_amount)
 trainset_x, testset_x = real_stock_price[0:train_size], real_stock_price[train_size- 60:len(real_stock_price)]
 print('Observations: %d' % (len(real_stock_price)))
@@ -321,6 +303,7 @@ def preprocess_FR(inputs, time_steps = 60):
         X_test_temp = []
         for i in range(time_steps, inputs.shape[0]):
             X_test_temp.append(inputs[i - time_steps:i, x])
+
         X_test_temp = np.array(X_test_temp)
         if X_test == []:
             X_test = X_test_temp
@@ -329,13 +312,19 @@ def preprocess_FR(inputs, time_steps = 60):
             y += 1
         else:
             X_test_temp = np.reshape(X_test_temp, (X_test_temp.shape[0], X_test_temp.shape[1],1))
-            X_test = np.append(X_test, X_test_temp, axis = 2)
-    y_test = inputs[inputs.shape[0] - time_steps:, :]
+            X_test = np.concatenate((X_test, X_test_temp), axis = 2)
+    y_test = inputs[time_steps:, :]
     print(X_test.shape)
     return X_test, y_test
 
 X_train1, y_train1 = preprocess_FR(trainset_x)
 X_test1, y_test1 = preprocess_FR(testset_x)
+X_test1.shape
+
+print(X_test1[:,-1,49])
+print(y_test1[:,49])
+y_test1.shape
+y_train1.shape
 
 y_test1 = testset_x[-49:, :]
 print(testset_x.shape)
@@ -347,10 +336,37 @@ y_test1.shape
 y_test1 = np.array(y_test1)
 print(y_test1[:,49])
 
+y_fit = MinMaxScaler(feature_range = (0,1))
+# y_fit.fit()
+
+
+regressor = Sequential()
+
+regressor.add(LSTM(units = 164,stateful=True, return_sequences = True, input_shape = (X_train.shape[1],X_train.shape[2])))
+regressor.add(Dropout(0.2))
+
+regressor.add(LSTM(units = 164,stateful=True, return_sequences = True))
+regressor.add(Dropout(0.2))
+
+regressor.add(LSTM(units = 164, stateful=True,return_sequences = True))
+regressor.add(Dropout(0.2))
+
+regressor.add(LSTM(units = 164,stateful=True))
+regressor.add(Dropout(0.2))
+
+regressor.add(Dense(units = y_train.shape[1]))
+
+regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
+
+
 regressor.fit(X_train1, y_train1, epochs= 100, batch_size = 100)
+
 
 regressor.save('train_1980.h5')
 regressor.save_weights('train_1980_weights.h5')
+
+
+regressor = load_model('train_2000_AAPL.h5')
 
 ############### DISPLAY GRAPH ##############
 print(X_test1.shape)
@@ -366,14 +382,15 @@ y_testTEST = sc.inverse_transform(y_test1)
 print(y_test1[:,49])
 print(y_testTEST[:,49])
 
-predicted_stock_price = regressor.predict(X_test1)
+predicted_stock_price = regressor.predict(X_train1)
 predicted_stock_price = sc.inverse_transform(predicted_stock_price)
 y_test1 = sc.inverse_transform(y_test1)
 print(X_test1[:,0,49])
 x_test_reverse = np.reshape(X_test1[:0,49], (-1,1))
 x_test_reverse = sc.inverse_transform(X_test1[:,0,49])
 print(y_test1[:,49])
-
+print(y_test1.shape)
+print(predicted_stock_price.shape)
 print(predicted_stock_price[:,49])
 
 ticker_name = 'AAPL'
@@ -382,7 +399,9 @@ with open("sp500tickers.pickle", "rb") as f:
 index = tickers.index(ticker_name)
 
 plt.plot(real_stock_price_unscaled[(real_stock_price_unscaled.shape[0] - X_test1.shape[0]):,index], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
-plt.plot(predicted_stock_price[:,index], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
+
+plt.plot(y_train1[-7:,49], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
+plt.plot(predicted_stock_price[-7:,0], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
 plt.title('{} Stock Price Prediction'.format(ticker_name))
 plt.xlabel('Time in days')
 plt.ylabel('{} Stock Price'.format(ticker_name))
