@@ -1,25 +1,24 @@
-import pandas as pd 
-import numpy as np
-import matplotlib.pyplot as plt 
-import matplotlib.ticker as ticker 
-import datetime as dt 
-import matplotlib.dates as mdates
+import datetime as dt
 import os
-from matplotlib import style
 import pickle
+import warnings
 # import pandas_datareader
 from collections import Counter
-from sklearn import svm, neighbors
-from sklearn.ensemble import VotingClassifier, RandomForestClassifier
-from sklearn.metrics import confusion_matrix
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from keras.layers import LSTM, Dense, Dropout, TimeDistributed
 from keras.models import Sequential, load_model
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.layers import Dropout
+from matplotlib import style
+from sklearn import neighbors, svm
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import MinMaxScaler
+from tensorflow.python.client import device_lib
 
-import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 
@@ -270,12 +269,12 @@ y_train = np.reshape(y_train, (y_train.shape[1], y_train.shape[0]))
 print(X_train.shape)
 print(y_train.shape)
 
-
+print(device_lib.list_local_devices())
 
 ##########################################################
 
 TOTAL_DATASET = pd.read_csv('sp500_joined_close.csv')
-real_stock_price_unscaled = TOTAL_DATASET.iloc[5000:, 1:].values
+real_stock_price_unscaled = TOTAL_DATASET.iloc[-5060:, 1:].values
 np.nan_to_num(real_stock_price_unscaled, copy=False)
 
 sc = MinMaxScaler(feature_range = (0,1))
@@ -283,18 +282,33 @@ sc.fit(real_stock_price_unscaled)
 
 real_stock_price = sc.transform(real_stock_price_unscaled)
 
-print(real_stock_price[real_stock_price.shape[0] - 49:, 49])
-
 train_test_split_amount = 0.95
 train_size = int(len(real_stock_price) * train_test_split_amount)
-trainset_x, testset_x = real_stock_price[0:train_size], real_stock_price[train_size- 60:len(real_stock_price)]
+train_size = 4810
+trainset_x, testset_x = real_stock_price[0:train_size,:], real_stock_price[train_size- 60:len(real_stock_price)]
 print('Observations: %d' % (len(real_stock_price)))
 print('Training Observations: %d' % (len(trainset_x)))
 print('Testing Observations: %d' % (len(testset_x)))
 
-# trainset_x = sc.transform(trainset_x)
-# testset_x = sc.transform(testset_x)
-print(trainset_x)
+time_steps = 60
+
+ticker_name = 'BBY'
+with open("sp500tickers.pickle", "rb") as f:
+    tickers = pickle.load(f)
+
+index = tickers.index(ticker_name)
+y_total = real_stock_price_unscaled[:,index]
+y_total = np.reshape(y_total, (-1,1))
+y_scalar = MinMaxScaler(feature_range = (0,1))
+y_scalar.fit(y_total)
+
+y_train = real_stock_price_unscaled[time_steps:train_size, index]
+y_train = np.reshape(y_train, (-1,1))
+y_train = y_scalar.transform(y_train)
+y_test = real_stock_price_unscaled[train_size:, index]
+y_test = np.reshape(y_test, (-1,1))
+y_test = y_scalar.transform(y_test)
+
 
 def preprocess_FR(inputs, time_steps = 60):
     X_test = []
@@ -313,95 +327,90 @@ def preprocess_FR(inputs, time_steps = 60):
         else:
             X_test_temp = np.reshape(X_test_temp, (X_test_temp.shape[0], X_test_temp.shape[1],1))
             X_test = np.concatenate((X_test, X_test_temp), axis = 2)
-    y_test = inputs[time_steps:, :]
-    print(X_test.shape)
-    return X_test, y_test
+    return X_test
 
-X_train1, y_train1 = preprocess_FR(trainset_x)
-X_test1, y_test1 = preprocess_FR(testset_x)
-X_test1.shape
+X_train= preprocess_FR(trainset_x)
+X_test = preprocess_FR(testset_x)
 
-print(X_test1[:,-1,49])
-print(y_test1[:,49])
-y_test1.shape
-y_train1.shape
+print(X_train.shape)
+print(y_train.shape)
+print(X_test.shape)
+print(y_test.shape)
 
-y_test1 = testset_x[-49:, :]
-print(testset_x.shape)
-print(X_train1)
-print(y_train1)
-print(type(y_test1))
-X_test1.shape
-y_test1.shape
-y_test1 = np.array(y_test1)
-print(y_test1[:,49])
+# regressor = Sequential()
 
-y_fit = MinMaxScaler(feature_range = (0,1))
-# y_fit.fit()
+# regressor.add(LSTM(units = 256,stateful=True, return_sequences = True, batch_input_shape = (25, X_train.shape[1],X_train.shape[2])))
+# regressor.add(Dropout(0.2))
 
+# regressor.add(LSTM(units = 256,stateful=True, return_sequences = True))
+# regressor.add(Dropout(0.2))
+
+# regressor.add(LSTM(units = 256, stateful=True,return_sequences = True))
+# regressor.add(Dropout(0.2))
+
+# regressor.add(LSTM(units = 256,stateful=True))
+# regressor.add(Dropout(0.2))
+
+# regressor.add((Dense(units= 1024)))
+# regressor.add(Dropout(0.2))
+
+# regressor.add(Dense(units = y_train.shape[1]))
+
+# regressor.compile(optimizer = 'adam', loss = 'mean_squared_error', metrics=['mean_squared_error'])
 
 regressor = Sequential()
 
-regressor.add(LSTM(units = 164,stateful=True, return_sequences = True, input_shape = (X_train.shape[1],X_train.shape[2])))
+regressor.add(LSTM(units = 256, return_sequences = True, input_shape = (X_train.shape[1],X_train.shape[2])))
 regressor.add(Dropout(0.2))
 
-regressor.add(LSTM(units = 164,stateful=True, return_sequences = True))
+regressor.add(LSTM(units = 256,return_sequences = True))
 regressor.add(Dropout(0.2))
 
-regressor.add(LSTM(units = 164, stateful=True,return_sequences = True))
+regressor.add(LSTM(units = 256, return_sequences = True))
 regressor.add(Dropout(0.2))
 
-regressor.add(LSTM(units = 164,stateful=True))
+regressor.add(LSTM(units = 256))
+regressor.add(Dropout(0.2))
+
+regressor.add((Dense(units= 1024)))
 regressor.add(Dropout(0.2))
 
 regressor.add(Dense(units = y_train.shape[1]))
 
 regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
 
+regressor.fit(X_train, y_train, epochs= 100, batch_size = 25)
 
-regressor.fit(X_train1, y_train1, epochs= 100, batch_size = 100)
-
-
-regressor.save('train_1980.h5')
-regressor.save_weights('train_1980_weights.h5')
+regressor.save('256_BBY_UNSTATEFUL.h5')
+regressor.save_weights('256_BBY_UNSTATEFUL_weights.h5')
 
 
-regressor = load_model('train_2000_AAPL.h5')
+regressor = load_model('256,stateful,timedistributed_2000_allstocks.h5')
 
 ############### DISPLAY GRAPH ##############
-print(X_test1.shape)
-OK_TEST = real_stock_price_unscaled[(real_stock_price_unscaled.shape[0] - X_test1.shape[0] - 60):, 0:]
-
-OK_TEST.shape
-OK_TEST = sc.transform(OK_TEST)
-OK_TESTX, OK_TESTY = preprocess_FR(OK_TEST)
 
 
-print(y_test1[:49])
-y_testTEST = sc.inverse_transform(y_test1)
-print(y_test1[:,49])
-print(y_testTEST[:,49])
+predicted_stock_price = regressor.predict(X_test, batch_size = 25)
 
-predicted_stock_price = regressor.predict(X_train1)
-predicted_stock_price = sc.inverse_transform(predicted_stock_price)
-y_test1 = sc.inverse_transform(y_test1)
-print(X_test1[:,0,49])
-x_test_reverse = np.reshape(X_test1[:0,49], (-1,1))
-x_test_reverse = sc.inverse_transform(X_test1[:,0,49])
-print(y_test1[:,49])
-print(y_test1.shape)
-print(predicted_stock_price.shape)
-print(predicted_stock_price[:,49])
+predicted_stock_price = y_scalar.inverse_transform(predicted_stock_price)
 
-ticker_name = 'AAPL'
-with open("sp500tickers.pickle", "rb") as f:
-    tickers = pickle.load(f)
-index = tickers.index(ticker_name)
+y_test = y_scalar.inverse_transform(y_test)
 
-plt.plot(real_stock_price_unscaled[(real_stock_price_unscaled.shape[0] - X_test1.shape[0]):,index], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
 
-plt.plot(y_train1[-7:,49], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
-plt.plot(predicted_stock_price[-7:,0], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
+
+plt.plot(y_test[-60:], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
+plt.plot(predicted_stock_price[-60:], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
+plt.title('{} Stock Price Prediction'.format(ticker_name))
+plt.xlabel('Time in days')
+plt.ylabel('{} Stock Price'.format(ticker_name))
+plt.legend()
+plt.show()
+
+
+
+
+plt.plot(y_train[-210:], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
+plt.plot(X_train[-150:,0,index], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
 plt.title('{} Stock Price Prediction'.format(ticker_name))
 plt.xlabel('Time in days')
 plt.ylabel('{} Stock Price'.format(ticker_name))
@@ -414,37 +423,8 @@ plt.show()
 
 
 
+plt.plot(real_stock_price_unscaled[(real_stock_price_unscaled.shape[0] - X_test1.shape[0]):,index], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
 
 
 
 
-print(index)
-print(y_test1[:,49].shape)
-print(OK_TESTX[0,0,1])
-OK_TEST.shape
-OK_TESTX.shape
-predicted_stock_price.shape
-OKTESTXX = sc.inverse_transform(OK_TESTX)
-
-WOWOWOWOW = MinMaxScaler(feature_range = (0,1))
-WOWOWOWOW.fit(testset_x)
-TESTING = real_stock_price_unscaled
-TESTING1= WOWOWOWOW.transform(TESTING)
-TESTING1 = WOWOWOWOW.inverse_transform(TESTING1)
-
-for row in range(TESTING.shape[0]):
-    for column in range(TESTING.shape[1]):
-        if TESTING[row, column] != TESTING1 [row, column]:
-            print('TESTING1: ', TESTING1[row, column])
-            print('TESTING1: ', TESTING1[row, column])
-            print("ROW, COLUMN", row, column)
-            break
-        else:
-            continue
-    break
-
-print(TESTING== TESTING1)
-print(TESTING1)
-
-print(TESTING1[0,1])
-print(TESTING[0,1])
