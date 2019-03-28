@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 style.use('ggplot')
 
-
+print(device_lib.list_local_devices())
 
 # allstock = pd.read_csv('all_stocks_5yr.csv')
 # print(allstock.head())
@@ -153,73 +153,6 @@ def do_ml(ticker):
 # do_ml('AAPL')
 
 
-dataset_train = pd.read_csv('sp500_joined_close.csv')
-training_set = dataset_train.iloc[:, 1:]. values
-
-print(training_set)
-np.nan_to_num(training_set, copy=False)
-
-# train_test_split_amount = 0.90
-# train_size = int(len(training_set) * train_test_split_amount)
-# x_train, x_test = training_set[0:train_size], training_set[train_size:len(training_set)]
-# print('Observations: %d' % (len(training_set)))
-# print('Training Observations: %d' % (len(x_train)))
-# print('Testing Observations: %d' % (len(x_test)))
-
-sc = MinMaxScaler(feature_range = (0,1))
-training_set_scaled = sc.fit_transform(training_set)
-print(training_set.shape)
-
-time_steps = 60
-X_train = []
-y_train = []
-for x in range(training_set_scaled.shape[1]):
-    X_train_temp = []
-    y_train_temp = []
-    for i in range(time_steps, training_set_scaled.shape[0]):
-        X_train_temp.append(training_set_scaled[i - time_steps:i, x])
-        y_train_temp.append(training_set_scaled[i,x])
-    X_train.append(X_train_temp)
-    y_train.append(y_train_temp)
-
-with open("sp500tickers.pickle", "rb") as f:
-    tickers = pickle.load(f)
-print(type(tickers))
-
-ticker = "ABBV"
-index = tickers.index(ticker)
-print(index)
-
-for i in range(time_steps, training_set_scaled.shape[0]):
-        y_train.append(training_set_scaled[i,index])
-
-y_train = np.array(y_train)
-X_train = np.array(X_train)
-
-X_train = np.reshape(X_train, (X_train.shape[1], X_train.shape[2], X_train.shape[0]))
-y_train = np.reshape(y_train, (y_train.shape[1], y_train.shape[0]))
-print(X_train.shape)
-print(y_train.shape)
-print(x_test.shape)
-
-
-
-X_train.shape
-y_train.shape
-
-regressor.fit(X_train, y_train, epochs= 100, batch_size = 32)
-
-regressor.save('my_model.h5')
-regressor.save_weights('my_model_weights.h5')
-
-
-regressor = load_model('train_1980.h5')
-
-dataset_test = pd.read_csv('TEST_sp500_joined_close_TEST.csv')
-real_stock_price = dataset_test.iloc[:, 1:].values
-
-
-
 
 
 
@@ -269,7 +202,7 @@ y_train = np.reshape(y_train, (y_train.shape[1], y_train.shape[0]))
 print(X_train.shape)
 print(y_train.shape)
 
-print(device_lib.list_local_devices())
+
 
 ##########################################################
 
@@ -282,17 +215,17 @@ sc.fit(real_stock_price_unscaled)
 
 real_stock_price = sc.transform(real_stock_price_unscaled)
 
-train_test_split_amount = 0.95
+train_test_split_amount = 0.90
 train_size = int(len(real_stock_price) * train_test_split_amount)
-train_size = 4810
-trainset_x, testset_x = real_stock_price[0:train_size,:], real_stock_price[train_size- 60:len(real_stock_price)]
+
+trainset_x, testset_x = real_stock_price[0:train_size,:], real_stock_price[train_size- 500:len(real_stock_price)]
 print('Observations: %d' % (len(real_stock_price)))
 print('Training Observations: %d' % (len(trainset_x)))
 print('Testing Observations: %d' % (len(testset_x)))
 
-time_steps = 60
+time_steps = 500
 
-ticker_name = 'BBY'
+ticker_name = 'MSFT'
 with open("sp500tickers.pickle", "rb") as f:
     tickers = pickle.load(f)
 
@@ -310,7 +243,7 @@ y_test = np.reshape(y_test, (-1,1))
 y_test = y_scalar.transform(y_test)
 
 
-def preprocess_FR(inputs, time_steps = 60):
+def preprocess_FR(inputs, time_steps = 500):
     X_test = []
     y = 0
     for x in range(inputs.shape[1]):
@@ -359,30 +292,22 @@ print(y_test.shape)
 # regressor.compile(optimizer = 'adam', loss = 'mean_squared_error', metrics=['mean_squared_error'])
 
 regressor = Sequential()
-
 regressor.add(LSTM(units = 256, return_sequences = True, input_shape = (X_train.shape[1],X_train.shape[2])))
 regressor.add(Dropout(0.2))
-
 regressor.add(LSTM(units = 256,return_sequences = True))
 regressor.add(Dropout(0.2))
-
 regressor.add(LSTM(units = 256, return_sequences = True))
 regressor.add(Dropout(0.2))
-
 regressor.add(LSTM(units = 256))
 regressor.add(Dropout(0.2))
-
 regressor.add((Dense(units= 1024)))
 regressor.add(Dropout(0.2))
-
 regressor.add(Dense(units = y_train.shape[1]))
-
 regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
-
 regressor.fit(X_train, y_train, epochs= 100, batch_size = 25)
 
-regressor.save('256_BBY_UNSTATEFUL.h5')
-regressor.save_weights('256_BBY_UNSTATEFUL_weights.h5')
+regressor.save('256_msft_UNSTATEFUL_INCOMPLETE.h5')
+regressor.save_weights('256_MSFT_UNSTATEFUL_INCOMPLETE_weights.h5')
 
 
 regressor = load_model('256,stateful,timedistributed_2000_allstocks.h5')
@@ -392,14 +317,41 @@ regressor = load_model('256,stateful,timedistributed_2000_allstocks.h5')
 
 predicted_stock_price = regressor.predict(X_test, batch_size = 25)
 
-predicted_stock_price = y_scalar.inverse_transform(predicted_stock_price)
 
-y_test = y_scalar.inverse_transform(y_test)
+ticker_name = 'MSFT'
+with open("sp500tickers.pickle", "rb") as f:
+    tickers = pickle.load(f)
+    
+index = tickers.index(ticker_name)
+
+df_prediction = pd.DataFrame(predicted_stock_price, columns = tickers)
+df_actual = pd.DataFrame(y_test, columns = tickers)
+
+df_buy = df_prediction.idxmax(axis = 1, skipna = True)
+df_sell = df_prediction.idxmin(axis = 1, skipna = True)
+
+total_earned = 0
+transaction_amount = 0
+transaction_cost = 1
+for index, row in df_actual.iterrows():
+  total_earned += row[df_buy[index]]
+  transaction_amount += 1
+  total_earned -= row[df_sell[index]]
+  transaction_amount += 1
+
+print("Earned a total of {}, with {} transcations".format(total_earned, transaction_amount))
+print("Which would equate to {} with transaction costs of {}.".format(total_earned - (transaction_cost * transaction_amount), transaction_cost))
 
 
 
-plt.plot(y_test[-60:], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
-plt.plot(predicted_stock_price[-60:], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
+
+
+
+
+
+
+plt.plot(y_test[:10], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
+plt.plot(predicted_stock_price[:10], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
 plt.title('{} Stock Price Prediction'.format(ticker_name))
 plt.xlabel('Time in days')
 plt.ylabel('{} Stock Price'.format(ticker_name))
@@ -407,7 +359,47 @@ plt.legend()
 plt.show()
 
 
+predicted_stock_price = y_scalar.inverse_transform(predicted_stock_price)
+y_test = y_scalar.inverse_transform(y_test)
 
+plt.plot(y_test[-210:], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
+plt.plot(predicted_stock_price[-210:,], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
+plt.title('{} Stock Price Prediction'.format(ticker_name))
+plt.xlabel('Time in days')
+plt.ylabel('{} Stock Price'.format(ticker_name))
+plt.legend()
+plt.show()
+
+predicted_price = regressor.predict(X_train, batch_size = 25)
+predicted_price = y_scalar.inverse_transform(predicted_price)
+actual = y_scalar.inverse_transform(y_train)
+
+difference_predicted = []
+difference_actual = []
+for index_num in range(predicted_price.shape[0] - 1):
+    difference_predicted.append(float(predicted_price[index_num+1] - predicted_price[index_num]))
+    difference_actual.append(float(actual[index_num+1] - actual[index_num]))
+
+print(difference_actual[0])
+print(difference_predicted[0])
+
+total_earned = 0
+transaction_amount = 0
+transaction_cost = 1
+for index_num in range(len(difference_actual)):
+    if difference_predicted[index_num] > 0.7:
+        # print("Index:{}, We predict an increase in {} when there was an actual change of {}".format(index_num, difference_predicted[index_num], difference_actual[index_num]))
+        total_earned += difference_actual[index_num]
+        transaction_amount += 1
+    elif difference_predicted[index_num] < -0.7:
+        # print("Index:{}, we predict an decrease in {} when there was an actual change of {}".format(index_num, difference_predicted[index_num], difference_actual[index_num]))
+        total_earned -= difference_actual[index_num]
+        transaction_amount += 1
+    else:
+        continue
+    
+print("Earned a total of {}, with {} transcations".format(total_earned, transaction_amount))
+print("Which would equate to {} with transaction costs of {}.".format(total_earned - (transaction_cost * transaction_amount), transaction_amount))
 
 plt.plot(y_train[-210:], color = 'red', label = 'Real {} Stock Price'.format(ticker_name))
 plt.plot(X_train[-150:,0,index], color='blue', label='Predicted {} Stock Price'.format(ticker_name))
@@ -416,6 +408,11 @@ plt.xlabel('Time in days')
 plt.ylabel('{} Stock Price'.format(ticker_name))
 plt.legend()
 plt.show()
+
+
+
+
+
 
 
 
