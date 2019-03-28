@@ -29,6 +29,7 @@ app.layout = html.Div([
     className = 'container', style = {'width':'98%', 'margin-left':10, 'margin-right':10, 'max-width':50000}
 )
 
+df_predictions = pd.read_csv('predictions.csv')
 
 @app.callback(
     Output(component_id = 'graphs', component_property = 'children'),
@@ -49,9 +50,20 @@ def update_graph(value):
             difference_df = difference_df.diff()
             difference_df_tmr = difference_df.shift(-1)
             difference_df_tmr = difference_df_tmr[:-1]
+            specific_prediction = df_predictions[ticker]
             difference = []
+            print(len(specific_prediction))
             for index in range(len(difference_df)- 1):
-                difference.append("Change since yesterday: {} </br> Change from tomorrow: {}".format(difference_df.iloc[index], difference_df_tmr.iloc[index]))
+                
+                if index >= (len(difference_df) - len(specific_prediction)):
+                    difference.append("Change since yesterday: {} </br> Change from tomorrow: {} </br> Predicted Change: {}".format(difference_df.iloc[index],
+                                                                                                                                    difference_df_tmr.iloc[index],
+                                                                                                                                    specific_prediction[index - (len(difference_df) - len(specific_prediction))]
+                                                                                                                                    ))
+                    
+                else:
+                    difference.append("Change since yesterday: {} </br> Change from tomorrow: {}".format(difference_df.iloc[index], difference_df_tmr.iloc[index]))
+                                      
             difference.append("Change since yesterday: {} </br> Change from tomorrow: {}".format(difference_df.iloc[index], "NaN"))
             
             candlestick = {
@@ -81,8 +93,6 @@ def update_graph(value):
                       'title': ticker}
         }
     ))
-            graphs.append(html.Div([dcc.Markdown(d(" **Hover Data** Mouse over Values")),
-                                    html.Pre(id = 'hover-data')]))
 
     return graphs
 
