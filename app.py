@@ -24,11 +24,7 @@ app.layout = html.Div([
         placeholder = "Type or Select a Stock Ticker",
         multi=True 
         ),
-    html.Div(id = 'graphs'),
-    html.Div([dcc.Markdown(d(" **Hover Data** Mouse over Values")),
-                                    html.Pre(id = 'hover-data') ]),
-    html.Div([dcc.Markdown(d(" **Click Data** Mouse over Values")),
-                                    html.Pre(id = 'click-data') ])
+    html.Div(id = 'graphs')
                       ],
     className = 'container', style = {'width':'98%', 'margin-left':10, 'margin-right':10, 'max-width':50000}
 )
