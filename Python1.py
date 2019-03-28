@@ -13,11 +13,11 @@ import seaborn as sns
 from keras.layers import LSTM, Dense, Dropout, TimeDistributed
 from keras.models import Sequential, load_model
 from matplotlib import style
-from sklearn import neighbors, svm
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.metrics import confusion_matrix
+# from sklearn import neighbors, svm
+# from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+# from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.python.client import device_lib
+# from tensorflow.python.client import device_lib
 
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
@@ -223,7 +223,7 @@ print('Observations: %d' % (len(real_stock_price)))
 print('Training Observations: %d' % (len(trainset_x)))
 print('Testing Observations: %d' % (len(testset_x)))
 
-time_steps = 500
+time_steps = 150
 
 ticker_name = 'MSFT'
 with open("sp500tickers.pickle", "rb") as f:
@@ -243,7 +243,28 @@ y_test = np.reshape(y_test, (-1,1))
 y_test = y_scalar.transform(y_test)
 
 
-def preprocess_FR(inputs, time_steps = 500):
+
+
+
+############################### - ACTUAL - ###########################################
+
+
+
+TOTAL_DATASET = pd.read_csv('sp500_joined_close.csv')
+total_dataset1 = TOTAL_DATASET.iloc[-2501:, 1:]
+total_dataset1.fillna(0, inplace=True)
+df = total_dataset1.diff()
+real_stock_price = df.iloc[1:, :].values
+
+train_test_split_amount = 0.90
+train_size = int(len(real_stock_price) * train_test_split_amount)
+time_steps = 150
+trainset_x, testset_x = real_stock_price[0:train_size,:], real_stock_price[train_size- time_steps:len(real_stock_price)]
+print('Observations: %d' % (len(real_stock_price)))
+print('Training Observations: %d' % (len(trainset_x)))
+print('Testing Observations: %d' % (len(testset_x)))
+
+def preprocess_FR(inputs, time_steps = 150):
     X_test = []
     y = 0
     for x in range(inputs.shape[1]):
@@ -262,8 +283,14 @@ def preprocess_FR(inputs, time_steps = 500):
             X_test = np.concatenate((X_test, X_test_temp), axis = 2)
     return X_test
 
-X_train= preprocess_FR(trainset_x)
-X_test = preprocess_FR(testset_x)
+
+X_train= preprocess_FR(trainset_x, time_steps)
+X_test = preprocess_FR(testset_x, time_steps)
+
+y_train = real_stock_price[time_steps:train_size, :]
+y_test = real_stock_price[train_size:, :]
+
+
 
 print(X_train.shape)
 print(y_train.shape)
@@ -271,24 +298,17 @@ print(X_test.shape)
 print(y_test.shape)
 
 # regressor = Sequential()
-
 # regressor.add(LSTM(units = 256,stateful=True, return_sequences = True, batch_input_shape = (25, X_train.shape[1],X_train.shape[2])))
 # regressor.add(Dropout(0.2))
-
 # regressor.add(LSTM(units = 256,stateful=True, return_sequences = True))
 # regressor.add(Dropout(0.2))
-
 # regressor.add(LSTM(units = 256, stateful=True,return_sequences = True))
 # regressor.add(Dropout(0.2))
-
 # regressor.add(LSTM(units = 256,stateful=True))
 # regressor.add(Dropout(0.2))
-
 # regressor.add((Dense(units= 1024)))
 # regressor.add(Dropout(0.2))
-
 # regressor.add(Dense(units = y_train.shape[1]))
-
 # regressor.compile(optimizer = 'adam', loss = 'mean_squared_error', metrics=['mean_squared_error'])
 
 regressor = Sequential()
@@ -310,7 +330,7 @@ regressor.save('256_msft_UNSTATEFUL_INCOMPLETE.h5')
 regressor.save_weights('256_MSFT_UNSTATEFUL_INCOMPLETE_weights.h5')
 
 
-regressor = load_model('256,stateful,timedistributed_2000_allstocks.h5')
+regressor = load_model('256_all_difference.h5')
 
 ############### DISPLAY GRAPH ##############
 
@@ -325,6 +345,8 @@ with open("sp500tickers.pickle", "rb") as f:
 index = tickers.index(ticker_name)
 
 df_prediction = pd.DataFrame(predicted_stock_price, columns = tickers)
+df.to_csv('predictions.csv')
+
 df_actual = pd.DataFrame(y_test, columns = tickers)
 
 df_buy = df_prediction.idxmax(axis = 1, skipna = True)
@@ -334,10 +356,10 @@ total_earned = 0
 transaction_amount = 0
 transaction_cost = 1
 for index, row in df_actual.iterrows():
-  total_earned += row[df_buy[index]]
-  transaction_amount += 1
-  total_earned -= row[df_sell[index]]
-  transaction_amount += 1
+    total_earned += row[df_buy[index]]
+    transaction_amount += 1
+    total_earned -= row[df_sell[index]]
+    transaction_amount += 1
 
 print("Earned a total of {}, with {} transcations".format(total_earned, transaction_amount))
 print("Which would equate to {} with transaction costs of {}.".format(total_earned - (transaction_cost * transaction_amount), transaction_cost))
